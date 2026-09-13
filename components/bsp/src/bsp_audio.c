@@ -21,6 +21,27 @@ static const audio_codec_gpio_if_t *s_gpio;
 static uint32_t s_hz;
 static uint8_t  s_bits, s_ch;
 static bool     s_opened;
+static bool     s_sleeping;
+
+#define AUDIO_DEFAULT_HZ   16000
+#define AUDIO_DEFAULT_BITS 16
+#define AUDIO_DEFAULT_CH   1
+
+// esp_codec_dev_open() 会先 disable 再重配 I2S；close 后通道处于 READY，
+// 先 enable 一次可让下一次 open 的内部 disable 合法。
+static esp_err_t audio_prepare_i2s_reopen(void) {
+    esp_err_t e = s_tx ? i2s_channel_enable(s_tx) : ESP_ERR_INVALID_STATE;
+    if (e != ESP_OK) {
+        ESP_LOGE(TAG, "I2S TX 恢复失败: %s", esp_err_to_name(e));
+        return e;
+    }
+    e = s_rx ? i2s_channel_enable(s_rx) : ESP_ERR_INVALID_STATE;
+    if (e != ESP_OK) {
+        ESP_LOGE(TAG, "I2S RX 恢复失败: %s", esp_err_to_name(e));
+        i2s_channel_disable(s_tx);
+    }
+    return e;
+}
 
 // esp_codec_dev 不拥有传入的接口和 I2S channel；失败回滚必须按依赖逆序逐一释放。
 static void audio_cleanup(void) {
@@ -57,6 +78,7 @@ static void audio_cleanup(void) {
         s_ctrl = NULL;
     }
     s_opened = false;
+    s_sleeping = false;
     s_hz = 0;
     s_bits = 0;
     s_ch = 0;
@@ -180,15 +202,17 @@ fail:
 
 esp_err_t bsp_audio_set_format(uint32_t hz, uint8_t bits, uint8_t ch) {
     if (!s_dev) return ESP_ERR_INVALID_STATE;
+    if (s_sleeping) return ESP_ERR_INVALID_STATE;
     if (s_opened && s_hz == hz && s_bits == bits && s_ch == ch) return ESP_OK;   // 同格式复用
 
     if (s_opened) {
-        esp_codec_dev_close(s_dev);
+        if (esp_codec_dev_close(s_dev) != ESP_CODEC_DEV_OK) {
+            ESP_LOGE(TAG, "esp_codec_dev_close 失败");
+            return ESP_FAIL;
+        }
         s_opened = false;
-        // close 把 I2S 通道退回 READY,而接下来的 open 内部又会 disable 一次 →
-        // 会打 "channel has not been enabled yet"。补一次 enable 让它合法。
-        if (s_tx) i2s_channel_enable(s_tx);
-        if (s_rx) i2s_channel_enable(s_rx);
+        esp_err_t e = audio_prepare_i2s_reopen();
+        if (e != ESP_OK) return e;
     }
 
     esp_codec_dev_sample_info_t fs = {
@@ -211,16 +235,75 @@ esp_err_t bsp_audio_set_format(uint32_t hz, uint8_t bits, uint8_t ch) {
     return ESP_OK;
 }
 
+esp_err_t bsp_audio_sleep(void) {
+    if (!s_dev || s_sleeping) return ESP_OK;
+
+    // esp_codec_dev_close() 仅在 codec-dev 标记为 opened 时才调用
+    // es8311_enable(false)。开机后从未播放的路径也必须先无声 open，
+    // 否则 ES8311 会停留在初始化后的工作配置而没有真正 suspend。
+    if (!s_opened) {
+        esp_err_t e = bsp_audio_set_format(AUDIO_DEFAULT_HZ,
+                                           AUDIO_DEFAULT_BITS,
+                                           AUDIO_DEFAULT_CH);
+        if (e != ESP_OK) {
+            // open 失败时 codec-dev 可能已有部分 opened 状态；尝试 close 回滚。
+            (void)esp_codec_dev_close(s_dev);
+            s_opened = false;
+            ESP_LOGE(TAG, "ES8311 休眠前无声打开失败: %s", esp_err_to_name(e));
+            return e;
+        }
+    }
+
+    // esp_codec_dev_close() 1.6.2 不传播 codec->enable(false) 的返回值；
+    // 先直接执行并检查 suspend，成功后再让 codec-dev 关闭 I2S 与内部 opened 状态。
+    if (!s_codec || !s_codec->enable ||
+        s_codec->enable(s_codec, false) != ESP_CODEC_DEV_OK) {
+        ESP_LOGE(TAG, "ES8311 suspend 寄存器写入失败");
+        return ESP_FAIL;
+    }
+    if (esp_codec_dev_close(s_dev) != ESP_CODEC_DEV_OK) {
+        ESP_LOGE(TAG, "ES8311 codec-dev close 失败");
+        return ESP_FAIL;
+    }
+    s_opened = false;
+    s_sleeping = true;
+    ESP_LOGI(TAG, "ES8311 已进入低功耗状态");
+    return ESP_OK;
+}
+
+esp_err_t bsp_audio_wake(void) {
+    if (!s_dev || !s_sleeping) return ESP_OK;
+
+    esp_err_t e = audio_prepare_i2s_reopen();
+    if (e != ESP_OK) return e;
+
+    // 允许内部格式设置重新 open codec；失败时再次 close，避免留下半唤醒状态。
+    s_sleeping = false;
+    e = bsp_audio_set_format(s_hz ? s_hz : AUDIO_DEFAULT_HZ,
+                             s_bits ? s_bits : AUDIO_DEFAULT_BITS,
+                             s_ch ? s_ch : AUDIO_DEFAULT_CH);
+    if (e != ESP_OK) {
+        (void)esp_codec_dev_close(s_dev);
+        s_opened = false;
+        s_sleeping = true;
+        ESP_LOGE(TAG, "ES8311 唤醒失败: %s", esp_err_to_name(e));
+        return e;
+    }
+
+    ESP_LOGI(TAG, "ES8311 已从低功耗状态恢复");
+    return ESP_OK;
+}
+
 esp_err_t bsp_audio_write(const void *pcm, size_t bytes) {
-    if (!s_dev) return ESP_ERR_INVALID_STATE;
+    if (!s_dev || !s_opened || s_sleeping) return ESP_ERR_INVALID_STATE;
     return esp_codec_dev_write(s_dev, (void *)pcm, bytes) == 0 ? ESP_OK : ESP_FAIL;
 }
 
 esp_err_t bsp_audio_read(void *pcm, size_t bytes) {
-    if (!s_dev) return ESP_ERR_INVALID_STATE;
+    if (!s_dev || !s_opened || s_sleeping) return ESP_ERR_INVALID_STATE;
     return esp_codec_dev_read(s_dev, pcm, bytes) == 0 ? ESP_OK : ESP_FAIL;
 }
 
 void bsp_audio_set_volume(uint8_t percent) {
-    if (s_dev) esp_codec_dev_set_out_vol(s_dev, percent);
+    if (s_dev && s_opened && !s_sleeping) esp_codec_dev_set_out_vol(s_dev, percent);
 }
