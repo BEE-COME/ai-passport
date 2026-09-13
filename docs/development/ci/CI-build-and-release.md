@@ -39,6 +39,26 @@ make sure the release title shows both.
   is visible in both the tag list and the release list. Do not rely on a
   human-readable body alone to carry the app name.
 
+## Changelog preparation
+
+Ordinary feature, application, and documentation pull requests leave the paired
+changelog files unchanged. Before creating and pushing a release tag, the
+release maintainer:
+
+1. Identifies the previous release and reviews the pull requests merged since it,
+   together with the authoritative product and application documentation.
+2. Collects user-visible features, fixes, compatibility changes, and release-flow
+   changes. Internal refactors, CI maintenance, typo fixes, and generated-file
+   refreshes are omitted.
+3. Updates `docs/CHANGELOG.md` and `docs/CHANGELOG.zh_CN.md` together, places the
+   released entries under a `## <tag> - YYYY-MM-DD` heading, and leaves a fresh
+   `Unreleased` section before committing the release preparation.
+
+Treat any existing `Unreleased` entries as pending input: verify them against the
+merged changes and the target release instead of copying them blindly. This
+release-preparation change is the owner of the shared changelog write and must be
+part of the commit that is tagged.
+
 ## Release notes
 
 A tag-triggered release succeeds only when the merged firmware and its release
@@ -55,8 +75,9 @@ things:
   interactions or hardware requirements of the release.
 
 Write the release notes in English (and a Simplified Chinese version where the
-project is bilingual) and link them from the GitHub/GitLab release. Keep them
-consistent with `docs/CHANGELOG.md` for user-visible behavior.
+project is bilingual) and link them from the GitHub/GitLab release. Derive the
+user-visible summary from the release-preparation changelog so the two remain
+consistent.
 
 ## Related documents
 
