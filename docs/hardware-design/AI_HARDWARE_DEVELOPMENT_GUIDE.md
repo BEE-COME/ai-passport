@@ -99,7 +99,7 @@ app_main
 
 Display/LVGL is a hard dependency. Buttons, audio, and battery are soft dependencies whose pages show `[FAIL]` while other pages remain available. Public BSP APIs are under `components/bsp/include/`. Successful display, button, audio, and LVGL initialization is idempotent. Display, button, and audio partial failures release resources acquired by the BSP; failed LVGL display registration deinitializes its port. The caller can correct the fault and retry, while an incomplete lower-level rollback is reported and prevents a handle from being overwritten. There is no universal BSP deinitialization API.
 
-Button callbacks run in the shared `esp_timer` task. They only enqueue input and return; the demo lifecycle task handles navigation and starts or stops slow services without holding the LVGL lock. Page exit first completes a bounded producer stop, then deletes timers and UI objects while holding the lock. Audio and light-sleep workers use cooperative cancellation and an explicit exit handshake rather than forced task deletion.
+Button callbacks run in the shared `esp_timer` task. They only enqueue input and return; the demo lifecycle task handles navigation and starts or stops slow services without holding the LVGL lock. Page exit first completes a bounded producer stop, then deletes timers and UI objects while holding the lock. Audio and light-sleep workers use cooperative cancellation and an explicit exit handshake rather than forced task deletion. The low-power worker suspends ES8311 before either sleep mode and resumes it after light sleep; deep-sleep wake restarts the application and follows normal BSP initialization.
 
 Wi-Fi, NimBLE, and sleep use ESP-IDF directly rather than the BSP. `demo_radio.c` owns shared NVS, `esp_netif`, and default-event-loop setup. Wi-Fi and Bluetooth pages allocate their radio stacks after page creation and stop/deinitialize them before page deletion. Do not erase NVS to hide partition errors. Deep sleep restarts the application and the demo uses RTC slow memory for the wake counter.
 
@@ -153,6 +153,9 @@ The MCU is I2S master and the ES8311 is slave. I2S0 TX/RX shares MCLK GPIO6, BCL
 - Microphone analog gain is 30 dB; output volume is a separate 0–100% value.
 - `bsp_audio_read/write` block and must not run in button callbacks or the LVGL task.
 - I2S DMA uses six descriptors of 240 frames each.
+- Stop every PCM reader and writer before calling `bsp_audio_sleep()`. It runs and checks the ES8311 software-suspend sequence, then closes the codec and I2S data path; if no format has ever been opened, the BSP first performs a silent default open because `esp_codec_dev_close()` otherwise skips the hardware suspend.
+- Call `bsp_audio_wake()` after light sleep to reopen the saved format and restart the codec/I2S path. The calls are idempotent, and an unavailable audio subsystem is treated as having nothing to suspend or resume. Deep-sleep wake reboots and uses the normal `bsp_audio_init()` path instead.
+- Software suspend stops the ES8311 ADC/DAC and clocks but does not switch off its physical 3.3 V rail. The external amplifier also remains outside software control because `BSP_I2S_PA_CTRL` is `-1`; residual standby draw from that hardware must be measured separately.
 
 The audio demo's three-second recording buffer is about 96 KB and is the largest transient heap allocation. Prefer chunked streaming for longer audio. Its worker checks cancellation between PCM chunks and acknowledges exit before the page is deleted; retain that bounded handshake when extending the demo.
 
@@ -246,7 +249,7 @@ General board acceptance:
 | Battery | plausible SOC/mV, graceful missing-device behavior, intermittent-I2C recovery |
 | Wi-Fi | visible scan count/SSID/RSSI, rescan, repeated entry/exit |
 | Bluetooth LE | phone sees `FoloPassport`, restart advertising, advertising stops on exit, repeated entry/exit |
-| Light/deep sleep | select with UP/DOWN; 2 s light sleep resumes with backlight; 5 s deep sleep restarts with timer cause and retained count |
+| Light/deep sleep | select with UP/DOWN; confirm ES8311 suspend before both modes; 2 s light sleep resumes codec/audio and backlight; 5 s deep sleep restarts with timer cause, retained count, and working audio after reinitialization |
 | DMA/memory/UI | build memory report, runtime minimum heap/largest block, stable concurrent audio/display |
 
 ## 14. Troubleshooting

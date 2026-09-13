@@ -121,7 +121,7 @@ app_main
 
 显示、按键、音频和 LVGL 成功初始化后可重复调用。显示、按键与音频在 BSP 中途失败时会释放本次取得的资源；LVGL display 注册失败时会 deinit port。调用方修正故障后可以重试；若底层回滚本身失败，会明确报错并拒绝覆盖仍存活的句柄。当前没有统一 deinit API，不要假设可以在运行时任意销毁和重建总线/驱动。
 
-按键回调运行在共享 `esp_timer` 任务中，只负责将输入加入队列并立即返回。demo 生命周期任务负责页面导航，并在不持有 LVGL 锁时启动或停止慢服务。退出页面时先以有界等待停止 producer，再持锁删除定时器和 UI 对象。音频与 light-sleep 工作任务使用协作取消和明确的退出握手，不再强制删除仍可能访问外设或 UI 的任务。
+按键回调运行在共享 `esp_timer` 任务中，只负责将输入加入队列并立即返回。demo 生命周期任务负责页面导航，并在不持有 LVGL 锁时启动或停止慢服务。退出页面时先以有界等待停止 producer，再持锁删除定时器和 UI 对象。音频与 light-sleep 工作任务使用协作取消和明确的退出握手，不再强制删除仍可能访问外设或 UI 的任务。低功耗工作任务会在两种睡眠前暂停 ES8311，并在 light sleep 返回后恢复；deep sleep 唤醒会重启应用并走正常 BSP 初始化流程。
 
 Wi-Fi、NimBLE 和 light/deep sleep 直接使用 ESP-IDF API，不属于板级 BSP。`demo_radio.c` 只管理 NVS、`esp_netif` 和默认 event loop 这些应用级共享前置。Wi-Fi 和 BLE 页在页面创建后初始化高内存占用的无线栈，在删除页面前停止并释放；不自动抹除已有 NVS 数据来掩盖分区错误。deep sleep 会按 ESP32-C3 语义重启应用，示例用 RTC slow memory 记录唤醒次数。
 
@@ -210,6 +210,9 @@ MCU 是 I2S master，ES8311 是 slave；I2S0 的 TX/RX 全双工通道共享 MCL
 - 麦克风模拟输入增益当前为 30 dB；输出音量 API 为 0–100%。增益和音量不是同一个概念。
 - `bsp_audio_read/write` 是阻塞调用，不能放在按键回调或 LVGL 任务中。
 - I2S DMA 当前为 6 个 descriptor、每个 240 frame。更改 DMA 或 LVGL buffer 前必须联合评估内部 RAM。
+- 调用 `bsp_audio_sleep()` 前必须停止所有 PCM 读写。该接口先执行并检查 ES8311 软件 suspend，再关闭 codec 和 I2S 数据通路；若此前从未打开过采样格式，BSP 会先做一次无声的默认格式 open，因为 `esp_codec_dev_close()` 否则会跳过硬件 suspend。
+- light sleep 返回后调用 `bsp_audio_wake()`，以休眠前格式重新打开 codec/I2S 通路。两个接口均为幂等操作；音频子系统不可用时视为无需暂停或恢复。deep sleep 唤醒会重启，改由正常 `bsp_audio_init()` 流程初始化。
+- 软件 suspend 会停止 ES8311 的 ADC/DAC 与时钟，但不会切断芯片物理 3.3 V 供电。由于 `BSP_I2S_PA_CTRL` 为 `-1`，外部功放也不受软件控制；这部分硬件残余待机电流需另行实测。
 
 Audio demo 使用独立 4 KB 栈任务：OK 播放 1 秒 1 kHz 方波，UP 录 3 秒再回放。录音缓冲约 96 KB，是当前最显著的瞬时堆分配，可能因碎片或其他功能增大而失败。新增长录音应优先采用分块流式处理或外部存储，不可假设存在 PSRAM。
 
@@ -437,7 +440,7 @@ idf.py flash monitor
 | 电池 | 合理 SOC 和 mV、无电量计时正确降级、断续 I2C 的错误恢复表现 |
 | Wi-Fi | 扫描总数和 SSID/RSSI 可见、OK 重扫描、反复进出后仍可扫描 |
 | Bluetooth LE | 手机看到 `FoloPassport`、OK 重启广播、退出后广播消失、反复进出无重启 |
-| light/deep sleep | Low Power 页用 UP/DOWN 选择、OK 执行；light sleep 约 2 秒后原地恢复背光；deep sleep 约 5 秒后重启，页面显示 timer 唤醒和 RTC 保留计数 |
+| light/deep sleep | Low Power 页用 UP/DOWN 选择、OK 执行；确认两种模式前 ES8311 均 suspend；light sleep 约 2 秒后恢复 codec/音频和背光；deep sleep 约 5 秒后重启，页面显示 timer 唤醒与 RTC 保留计数，并确认音频重新初始化后可用 |
 | DMA/内存/UI | build 内存报告、运行时最小堆/最大块、音频与刷屏并发稳定性 |
 
 ## 14. 故障症状速查

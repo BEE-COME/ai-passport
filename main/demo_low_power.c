@@ -1,6 +1,8 @@
 // main/demo_low_power.c —— light/deep sleep + RTC timer 唤醒验证。
+// 两种模式入睡前均 suspend ES8311；light sleep 返回后显式恢复。
 // 不使用按键唤醒：仓库尚无板级唤醒电路证据。
 #include "demo.h"
+#include "bsp_audio.h"
 #include "bsp_display.h"
 #include "ui_pixel.h"
 
@@ -65,6 +67,8 @@ static void sleep_task(void *arg)
 
         s_busy = true;
         if (command == SLEEP_COMMAND_DEEP) {
+            const char *failure = "Deep sleep";
+            bool audio_sleeping = false;
             set_status("DEEP SLEEP: 5 SEC\nApplication will restart");
             vTaskDelay(pdMS_TO_TICKS(250));
             if (s_stop_requested) {
@@ -73,30 +77,62 @@ static void sleep_task(void *arg)
             }
             esp_err_t err = esp_sleep_enable_timer_wakeup(DEEP_SLEEP_TIME_US);
             if (err == ESP_OK) {
+                err = bsp_audio_sleep();
+                failure = "Audio suspend";
+                audio_sleeping = (err == ESP_OK);
+            }
+            if (err == ESP_OK) {
+                failure = "Deep sleep";
                 if (s_deep_sleep_magic != DEEP_SLEEP_MAGIC) s_deep_sleep_count = 0;
                 s_deep_sleep_magic = DEEP_SLEEP_MAGIC;
                 s_deep_sleep_count++;
                 bsp_display_backlight(0);
                 esp_deep_sleep_start();
+                err = ESP_FAIL; // deep sleep 正常不会返回
             }
+            if (audio_sleeping) {
+                esp_err_t wake_err = bsp_audio_wake();
+                if (err == ESP_OK && wake_err != ESP_OK) {
+                    err = wake_err;
+                    failure = "Audio resume";
+                }
+            }
+            bsp_display_backlight(100);
+            esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
             char text[96];
-            snprintf(text, sizeof(text), "Deep sleep failed:\n%s", esp_err_to_name(err));
+            snprintf(text, sizeof(text), "%s failed:\n%s", failure, esp_err_to_name(err));
             set_status(text);
-            ESP_LOGE(TAG, "deep sleep 失败: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG, "%s 失败: %s", failure, esp_err_to_name(err));
         } else {
+            const char *failure = "Light sleep";
+            bool audio_sleeping = false;
             set_status("LIGHT SLEEP: 2 SEC\nTimer wakeup");
             vTaskDelay(pdMS_TO_TICKS(150));
             if (s_stop_requested) {
                 s_busy = false;
                 break;
             }
-            bsp_display_backlight(0);
-
             esp_err_t err = esp_sleep_enable_timer_wakeup(LIGHT_SLEEP_TIME_US);
+            if (err == ESP_OK) {
+                err = bsp_audio_sleep();
+                failure = "Audio suspend";
+                audio_sleeping = (err == ESP_OK);
+            }
+            if (err == ESP_OK) bsp_display_backlight(0);
             int64_t before = esp_timer_get_time();
-            if (err == ESP_OK) err = esp_light_sleep_start();
+            if (err == ESP_OK) {
+                failure = "Light sleep";
+                err = esp_light_sleep_start();
+            }
             int64_t slept_ms = (esp_timer_get_time() - before) / 1000;
             esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+            if (audio_sleeping) {
+                esp_err_t wake_err = bsp_audio_wake();
+                if (err == ESP_OK && wake_err != ESP_OK) {
+                    err = wake_err;
+                    failure = "Audio resume";
+                }
+            }
             bsp_display_backlight(100);
 
             char text[128];
@@ -104,8 +140,8 @@ static void sleep_task(void *arg)
                 snprintf(text, sizeof(text), "LIGHT WAKE: TIMER\nSlept: %lld ms",
                          (long long)slept_ms);
             } else {
-                snprintf(text, sizeof(text), "Light sleep failed:\n%s", esp_err_to_name(err));
-                ESP_LOGE(TAG, "light sleep 失败: %s", esp_err_to_name(err));
+                snprintf(text, sizeof(text), "%s failed:\n%s", failure, esp_err_to_name(err));
+                ESP_LOGE(TAG, "%s 失败: %s", failure, esp_err_to_name(err));
             }
             set_status(text);
         }
