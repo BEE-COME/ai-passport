@@ -7,6 +7,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// The final LVGL frame is masked to this radius; pixels outside are pure black.
+#define BSP_LVGL_SCREEN_RADIUS 30
+
 // 初始化 SPI 总线、面板、厂商寄存器、背光 LEDC。成功调用可重复；失败会回滚本次
 // 已创建的显示资源，修正故障后可重试。成功后屏幕已上电但内容未定。
 esp_err_t bsp_display_init(void);

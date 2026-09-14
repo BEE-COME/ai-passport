@@ -68,6 +68,8 @@ When details are omitted, the assistant may choose conservative defaults that do
 
 Each `demo/*` branch evolves the baseline into an independent application. The branches demonstrate how specific problems were solved. New applications should normally branch from `main` and consult relevant examples instead of merging multiple demos wholesale.
 
+The menu and `demo_*.c` pages on `main` are also hardware-capability demonstrations, not a ready-made product UI. A new application must redesign and implement its screens and interaction flow for its own requirements rather than directly using or copying the current demo interface. BSP APIs, lifecycle patterns, and isolated logic may still be reused.
+
 | Branch | Application | Patterns worth reusing |
 | --- | --- | --- |
 | `demo/stopwatch` | Stopwatch | Minimal timer application, separation of pure logic from LVGL, host-side logic tests |
