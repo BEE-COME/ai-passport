@@ -38,28 +38,52 @@ regenerated.
 
 ### Speeding up repeated builds
 
-ccache keeps incremental builds fast. ESP-IDF does not enable it by default;
-enable it for the current terminal, or make it permanent per project:
+ccache can reuse previous compiler results when sources need to be compiled
+again. ESP-IDF 5.5.3 disables it by default. After activating ESP-IDF, check that
+ccache is available and enable it for an individual build (the same command
+works in Linux/macOS shells and native Windows ESP-IDF terminals):
+
+```text
+ccache --version
+idf.py --ccache build
+```
+
+Alternatively, enable it for the current Linux/macOS shell and its child
+processes, including the validation script:
 
 ```bash
 export IDF_CCACHE_ENABLE=1
 idf.py build
 ```
 
+This is an `idf.py` option, not a `sdkconfig` or `menuconfig` setting. For
+repeatable project or CI builds, pass `--ccache` explicitly or set
+`IDF_CCACHE_ENABLE=1` in that build environment; do not silently edit shell
+startup files. See the [ESP-IDF 5.5.3 option definition](https://github.com/espressif/esp-idf/blob/v5.5.3/tools/idf_py_actions/core_ext.py).
+
+Inspect the active cache configuration instead of assuming a fixed path:
+
 ```text
-CONFIG_IDF_BUILD_USE_CCACHE=y
+ccache --show-config
+ccache --show-stats
 ```
 
-The ccache cache lives outside `build/`, so neither `idf.py fullclean` nor a
-temporary validation build removes it. When the cache must be cleared, remove
-the ccache directory itself (default `~/.ccache`, or wherever
-`CCACHE_DIR` points).
+The effective `cache_dir` depends on the ccache version, platform,
+configuration, and `CCACHE_DIR`; it is not always `~/.ccache`. Keep it outside
+`build/` and temporary validation directories so their removal preserves it.
+Cache clearing is not a routine build step. Only when intentionally clearing
+the active cache, use `ccache --clear`, which preserves the configuration file,
+instead of deleting the directory. This also discards cached compiler results
+for other projects sharing that cache. See the [ccache manual](https://ccache.dev/manual/latest.html).
 
-On Windows, slow repeated builds are frequently caused by antivirus or endpoint
-software scanning build directories in real time; add the ESP-IDF install
-directory, the tools directory (`%USERPROFILE%\.espressif` or a custom
-`IDF_TOOLS_PATH`), and the project build directory (`build/`) to the scan
-exclusions.
+On Windows, real-time antivirus or endpoint scanning can contribute to slow
+builds, but diagnose the bottleneck first. For Microsoft Defender, use its
+[performance analyzer](https://learn.microsoft.com/en-us/defender-endpoint/performance-analyzer-reference);
+its results are not automatic exclusion recommendations. Exclusions reduce
+protection and are optional: obtain user or administrator approval under the
+applicable security policy, then limit any exception to the smallest confirmed
+scope. Do not routinely exclude the entire ESP-IDF installation, tools tree,
+or project, and do not disable real-time protection.
 
 The tracked `dependencies.lock` pins Managed Component resolution. After changing an `idf_component.yml`, regenerate the lock with ESP-IDF 5.5.3, review version changes, and commit it with the manifest. An ordinary build must not leave an unexplained lock-file diff.
 
