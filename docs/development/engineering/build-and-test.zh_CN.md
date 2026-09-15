@@ -7,10 +7,15 @@
 使用 ESP-IDF 5.5.3。全新机器或缺少工具链时，先按
 [环境引导](environment-setup.zh_CN.md)完成安装。
 
-> 固件编译优先运行 `./tools/validate.sh --firmware`，烧录优先把验证通过的
-> `build/FoloToy-AI-Passport-full.bin` 写入空白设备；对已有身份的设备，只有合并文件
-> 在保护区 `cardid` 之前结束时才可从 `0x0` 直刷，其余情况使用分段
-> `idf.py flash`。`idf.py build` 和
+> **向设备下载（烧录）新固件前，无需备份设备内部原有固件。** 不要求先读出
+> 原固件，也不把原固件备份作为烧录前置条件。烧录会覆盖原固件，不会自动恢复
+> 原固件。这不代表用户数据会被保留：如果需要保留已有设置或记录，应事先
+> 导出或另行保存。详见[烧录与已存数据](firmware-layout.zh_CN.md#烧录与已存数据)。
+
+> 固件编译优先运行 `./tools/validate.sh --firmware`。空白设备初始化或有意完整
+> 刷新时，把验证通过的 `build/FoloToy-AI-Passport-full.bin` 从 `0x0` 写入；
+> 合并镜像可能重置 NVS，需要保留已有 NVS 状态时使用分段 `idf.py flash`。
+> `idf.py build` 和
 > `idf.py flash` 只作为增量开发命令，不作为默认交付方式。
 
 ```bash
@@ -49,7 +54,7 @@ ccache 缓存位于 `build/` 之外，因此 `idf.py fullclean` 和临时验证�
 
 仓库提交 `dependencies.lock` 以固定 ESP-IDF Managed Components 的解析结果。修改 `idf_component.yml` 后必须使用 ESP-IDF 5.5.3 重新生成锁文件、review 版本变化并与 manifest 一起提交；普通构建不应产生未提交的锁文件差异。
 
-固件门禁使用全新的临时构建目录，并从仓库 `sdkconfig.defaults` 生成隔离的 `sdkconfig`。它不会读取或覆盖开发者根目录的 `sdkconfig`，只把验证通过的合并镜像复制到 `build/FoloToy-AI-Passport-full.bin`。门禁同时强制检查[受保护的 Flash 布局](protected-flash-layout.zh_CN.md)：受保护的 `cardid` 地址、应用大小、分区表 MD5 以及单机身份数据不入包。
+固件门禁使用全新的临时构建目录，并从仓库 `sdkconfig.defaults` 生成隔离的 `sdkconfig`。它不会读取或覆盖开发者根目录的 `sdkconfig`，只把验证通过的合并镜像复制到 `build/FoloToy-AI-Passport-full.bin`。门禁同时验证[当前配置的固件布局](firmware-layout.zh_CN.md)：从 `flash_args` 读取镜像偏移，检查分区表 MD5、边界和不重叠，并确认应用从所配置的 app 分区起点开始且未超出分区。允许用户自定义分区布局。
 
 当前基线含一个可独立运行的纯逻辑测试：
 
@@ -64,7 +69,7 @@ cc -std=c11 -Wall -Wextra -Werror -Imain \
 
 ```bash
 ./tools/validate.sh --static    # 仓库一致性、workflow、文档链接、敏感信息、host tests
-./tools/validate.sh --firmware  # ESP-IDF build、merge-bin、偏移与保护布局校验
+./tools/validate.sh --firmware  # ESP-IDF build、merge-bin、偏移与当前布局校验
 ./tools/validate.sh             # 完整验证
 ```
 
