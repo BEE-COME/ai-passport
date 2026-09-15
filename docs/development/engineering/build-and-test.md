@@ -7,6 +7,13 @@
 Use ESP-IDF 5.5.3. On a clean machine or when the toolchain is missing, follow
 the [environment bootstrap](environment-setup.md) first.
 
+> **No original-firmware backup is required before downloading (flashing) new
+> firmware to the device.** Reading out the installed firmware is not a
+> prerequisite. Flashing replaces the installed firmware and does not provide
+> automatic restoration of it. This does not mean user data is preserved: if
+> you need existing settings or records, export or otherwise save them first.
+> See [flashing and stored data](firmware-layout.md#flashing-and-stored-data).
+
 > Prefer `./tools/validate.sh --firmware` for firmware builds. Flash its
 > verified `build/FoloToy-AI-Passport-full.bin` at offset `0x0` for a blank
 > device or an intentional complete refresh. The merged image may reset NVS;
