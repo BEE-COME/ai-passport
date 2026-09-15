@@ -61,4 +61,46 @@ When the developer submits a reusable asset through you — an image, font, audi
 
 The automated gate is not hardware acceptance. Report `Build`, `Host tests`, `Device tests`, and `Unverified` separately. Use the [hardware guide](../hardware-design/AI_HARDWARE_DEVELOPMENT_GUIDE.md) for the applicable on-device matrix.
 
+### Offer on-device testing
+
+After fully implementing each user-requested firmware feature or fix and
+running the applicable validation, proactively ask whether to flash the result
+to the device for testing. This applies to each completed development iteration,
+not just a project release. Do not end the handoff with only a build result or
+firmware path. For example:
+
+> The requested implementation is complete. Would you like me to flash the
+> validated firmware to your device and test it now?
+
+1. When device access is available, perform read-only USB/serial discovery
+   during handoff. Do not open/reset arbitrary ports or flash a device just
+   because it is connected. If multiple candidates exist or the target is
+   uncertain, ask the user to identify the intended device and port.
+2. If no device is detected, explicitly prompt:
+
+   > No device was detected. Please turn the device on, then connect it to a
+   > USB port on your computer using a data-capable USB cable, not a charge-only
+   > cable. Let me know when it is connected so I can check again.
+
+   Recheck after the user connects it. If this environment cannot access the
+   user's USB devices, state that limitation instead of claiming no device is
+   connected; guide the user through local detection/flashing and request the
+   test results.
+3. Before writing, confirm the target device, the exact validated firmware,
+   and its [flashing/data impact](engineering/firmware-layout.md#flashing-and-stored-data),
+   then obtain explicit approval for this flash. A connected device or a past
+   approval for another build is not authorization. Do not make a backup of the
+   original firmware a prerequisite, and do not assume permission for a
+   full-chip erase.
+4. After approved flashing, verify startup and the requested behavior using
+   the applicable hardware checklist, with user observations where needed.
+   Successful flashing alone is not `Device tests: PASS`. If the user declines
+   or postpones testing, no device is available, or access is unavailable,
+   report `Device tests: NOT RUN` and list the pending checks in `Unverified`.
+
+For documentation-only or other tasks that do not change firmware, explain
+that on-device testing is not applicable; do not flash unrelated firmware just
+to satisfy this workflow. This test invitation does not authorize commits,
+pushes, or any of the optional [project-closing actions](release/project-completion.md).
+
 Related documents: [build and test](engineering/build-and-test.md), [coding conventions](engineering/coding-conventions.md), [hardware guide](../hardware-design/AI_HARDWARE_DEVELOPMENT_GUIDE.md), [documentation index](../README.md), and [root `AGENTS.md`](../../AGENTS.md).

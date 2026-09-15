@@ -60,6 +60,12 @@ Device tests: PASS / FAIL / NOT RUN
 Unverified: 仍需板卡、仪器或用户确认的事项
 ```
 
+每次完整实现用户提出的固件需求后，必须主动询问是否将固件刷写到设备中进行
+测试，不能只等到发布时才询问。未检测到设备时，提示用户将设备开机，再用
+支持数据传输的数据线连接电脑 USB 接口。遵循
+[真机测试交接流程](docs/development/ai-guide.zh_CN.md#主动询问真机测试)，
+烧录前须取得用户同意；检测到设备本身不代表获得烧录授权。
+
 仅在用户请求或当前工作流明确要求时创建 commit 和 push。普通功能、应用和文档 PR 不得修改 `docs/CHANGELOG.md` 或 `docs/CHANGELOG.zh_CN.md`；用户可见行为、兼容性和发布流程影响改为写入 PR 正文及对应权威文档。发布准备期间，由发布负责人在创建 tag 前把已合并的用户可见变化统一汇总到两份变更日志。
 
 社区规范见 `.github/CONTRIBUTING.zh_CN.md`、`.github/CODE_OF_CONDUCT.zh_CN.md`、`.github/SECURITY.zh_CN.md` 与 `.github/SUPPORT.zh_CN.md`。
