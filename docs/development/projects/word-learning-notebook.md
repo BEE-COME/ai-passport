@@ -1,8 +1,8 @@
 <p align="right"><a href="word-learning-notebook.zh_CN.md">简体中文</a> · <strong>English</strong></p>
 
-# Word Learning Notebook: Requirements (Draft)
+# Word Learning Notebook: Project Notes
 
-> Status: V1 implemented and build-verified; device testing pending.
+> Status: V1 implemented; build, host tests, and on-device UI validation completed.
 > Baseline: FoloToy AI Passport repository `main`.
 > Branch: `feature/word-learning-notebook`.
 > Data source: <https://ogden.munch.love/> (Ogden Basic English 850).
@@ -20,8 +20,8 @@ V1 paths:
 - Browse by six built-in categories with the full word card.
 - Daily study with a 10-word session and flip-to-reveal cards that speak the
   word on reveal.
-- Quiz with a Chinese prompt, three English choices, top/middle/bottom buttons
-  mapped to the choices, and spoken feedback for the correct answer.
+- Quiz with a Chinese prompt, three English choices selected with UP/DOWN,
+  confirmation with OK, and spoken feedback for the correct answer.
 - Starred-words list and cumulative learning statistics persisted in NVS.
 
 ## 2. Hardware and BSP boundary
@@ -42,19 +42,19 @@ Home: app title, battery indicator, six entries, and a cumulative progress
 summary (for example, 120 / 850 mastered).
 
 Browse: All 850, Operations 100, General Things 400, Picturable 200, Qualities
-100, Opposites 50. A selected category opens a scrollable word list; the detail
-card. Up/down first scroll the detail content and switch words only at the
-scroll boundary. OK short plays the word; a quick double press toggles the star;
-OK long returns to the list.
+100, Opposites 50. A selected category opens a word list. UP/DOWN moves through
+the list and OK opens the detail card. In details, UP/DOWN directly changes the
+word, OK plays pronunciation, a quick double press toggles the star, and OK long
+returns to the list.
 
 Daily study: 10 words sampled in source order, one card at a time. OK flips the
 card and plays the word; pressing OK again replays it. UP/DOWN move between
 cards. A revealed card is marked as learning.
 
-Quiz: each question shows a Chinese prompt and three English choices laid out
-top/middle/bottom, mapped to UP/OK/DOWN. Answer feedback is immediate, the
-correct choice is shown and spoken, OK advances, and UP/DOWN replay the word.
-A session is 10 questions and updates mastered/learning progress.
+Quiz: each question shows a Chinese prompt and three English choices. UP/DOWN
+selects a choice and OK confirms it. Answer feedback is immediate, the correct
+choice is shown and spoken, OK advances, and UP/DOWN replay the word. A session
+is 10 questions and updates mastered/learning progress.
 
 Stars and statistics: starred words are listed; stats show mastered, learning,
 starred, and session counts. Calendar streaks are not in V1 because the device
@@ -94,8 +94,8 @@ has no reliable clock source.
   `<script id="data" type="application/json">` on the data site.
 - Fields: `w`, `c`, `zh`, `en`, `ex`, `exz`, `s`, `core`.
 - Save source data under `assets/data/ogden-850.json`, record the fetch and
-  conversion commands in `assets/data/README.md`, and generate static C tables
-  under `main/words_generated.c/h`.
+  conversion commands in `assets/data/README.md`, and generate the static C
+  table in `main/word_data.c/.h`.
 - The extended synonym map on the site is not used in V1.
 - Current scale: 850 records, about 123 KB UTF-8 JSON, 1623 distinct Han
   characters in the page data. Flash budget is sufficient.
@@ -131,11 +131,10 @@ repository gate is:
 ./tools/validate.sh
 ```
 
-The verified merged image is `build/FoloToy-AI-Passport-full.bin`, written at
-`0x0` only after explicit approval. Device acceptance includes Chinese
-rendering, navigation, battery fallback, persistence after reboot, and repeated
-page-entry stability. Results are reported separately as Build, Host tests,
-Device tests, and Unverified.
+The merged image is `build/FoloToy-AI-Passport-full.bin`, written at `0x0`.
+Device checks covered Chinese rendering, navigation, battery fallback,
+persistence after reboot, and repeated page-entry stability. Results are
+reported separately as Build, Host tests, Device tests, and Unverified.
 
 ## 10. Confirmed defaults
 
