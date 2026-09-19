@@ -28,6 +28,9 @@ CONFIG_LV_MEM_SIZE_KILOBYTES=24
 # --- 系统 ---
 CONFIG_FREERTOS_HZ=1000
 
+# 离线发音与 NVS 保存可能并发；将 I2S ISR 放入 IRAM，避免 Flash 写期间中断失配。
+CONFIG_I2S_ISR_IRAM_SAFE=y
+
 # --- Bluetooth LE / NimBLE ---
 # ESP32-C3 仅支持 BLE；示例只启用单连接 peripheral 所需的最小 host 配置。
 CONFIG_BT_ENABLED=y

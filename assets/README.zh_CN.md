@@ -15,6 +15,18 @@
 - 添加字库前评估 Flash 与内部 RAM 影响；ESP32-C3 无 PSRAM。
 - 不提交许可不允许分发的字库。
 
+单词学习本的字库与重新生成命令见 `fonts/README.zh_CN.md`。
+
+## 数据（data）
+
+静态数据集放在 `data/`。Ogden Basic English 850 JSON、来源地址与提取工具
+记录在 `data/README.zh_CN.md`。
+
+## 音频（audio）
+
+离线发音或声音资产放在 `audio/`。单词学习本的发音数据块、eSpeak NG 版本、
+ADPCM 编码与生成脚本记录在 `audio/README.zh_CN.md`。
+
 ## 图片（images）
 
 可复用的源图与生成的显示资产放在 `images/`。

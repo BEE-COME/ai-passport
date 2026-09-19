@@ -32,6 +32,18 @@ run_static_checks() {
         tests/test_demo_navigation.c main/demo_navigation.c \
         -o "${test_dir}/test_demo_navigation"
     "${test_dir}/test_demo_navigation"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_word_model.c main/word_model.c \
+        -o "${test_dir}/test_word_model"
+    "${test_dir}/test_word_model"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_word_quiz.c main/word_quiz.c \
+        -o "${test_dir}/test_word_quiz"
+    "${test_dir}/test_word_quiz"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_word_data.c main/word_data.c \
+        -o "${test_dir}/test_word_data"
+    "${test_dir}/test_word_data"
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Icomponents/bsp/src \
         tests/test_bsp_display_rounding.c components/bsp/src/bsp_display_rounding.c \
         -o "${test_dir}/test_bsp_display_rounding"
@@ -43,6 +55,8 @@ run_static_checks() {
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_deep_sleep_contract.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_check_repo.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_verify_firmware.py
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/test_audio_assets.py
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/test_font_coverage.py
     rm -rf "${test_dir}"
     echo "Host tests: PASS"
 }

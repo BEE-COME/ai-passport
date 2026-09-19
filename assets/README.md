@@ -17,6 +17,20 @@ Store reusable font files and generated font sources in `fonts/`.
 - Check Flash and internal-RAM impact before adding a font; the ESP32-C3 has no PSRAM.
 - Do not commit fonts whose license does not permit redistribution.
 
+The Word Learning Notebook fonts and their regeneration commands are documented
+in `fonts/README.md`.
+
+## Data
+
+Store static datasets in `data/`. The Ogden Basic English 850 JSON, its source
+URL, and the extraction tool are documented in `data/README.md`.
+
+## Audio
+
+Store offline pronunciation or sound assets in `audio/`. The Word Learning
+Notebook pronunciation blob, eSpeak NG version, ADPCM encoding, and
+regeneration script are documented in `audio/README.md`.
+
 ## Images
 
 Store reusable source images and generated display assets in `images/`.

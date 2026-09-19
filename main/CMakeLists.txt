@@ -1,16 +1,24 @@
 idf_component_register(
     SRCS "main.c"
-         "demo_navigation.c"
-         "ui_pixel.c"
-         "ui_pixel_math.c"
-         "demo_display.c"
-         "demo_button.c"
-         "demo_audio.c"
-         "demo_battery.c"
-         "demo_radio.c"
-         "demo_wifi.c"
-         "demo_ble.c"
-         "demo_low_power.c"
+         "app_fonts.c"
+         "word_data.c"
+         "audio_index.c"
+         "word_model.c"
+         "word_quiz.c"
+         "word_store.c"
+         "audio_player.c"
+         "word_app.c"
     INCLUDE_DIRS "."
-    REQUIRES bsp bt esp_event esp_hw_support esp_netif esp_timer esp_wifi nvs_flash
+    REQUIRES bsp esp_hw_support esp_timer nvs_flash
+)
+
+target_sources(${COMPONENT_LIB} PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../assets/fonts/app_font_16.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../assets/fonts/app_font_20.c"
+)
+
+target_add_binary_data(${COMPONENT_LIB}
+    "${CMAKE_CURRENT_LIST_DIR}/../assets/audio/ogden_words.adpcm"
+    BINARY
+    RENAME_TO ogden_words_blob
 )
